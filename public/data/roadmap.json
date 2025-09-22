@@ -1,0 +1,428 @@
+{
+  "phases": [
+    {
+      "id": "phase-1",
+      "title": "Phase 1 · Week 1-4 · Foundations",
+      "summary": "Python/R basics, CLI toolcraft, Docker, first two small projects",
+      "weeks": [
+        {
+          "number": 1,
+          "theme": "Kick-off & project scaffolding",
+          "milestones": [
+            "Create study tracking repo with README",
+            "Set up Python environment and first cleaning script",
+            "Publish 1 micro update"
+          ],
+          "tasks": [
+            {
+              "id": "w1-d1",
+              "kind": "deliverable",
+              "title": "Create \"clinical-ds-roadmap\" repo skeleton",
+              "details": "README covering goals, milestones, directory.",
+              "resources": [
+                {
+                  "label": "README template",
+                  "url": "https://www.makeareadme.com/"
+                }
+              ]
+            },
+            {
+              "id": "w1-d2",
+              "kind": "practice",
+              "title": "Write first data cleaning script with tests",
+              "details": "Pandas data cleaning + pytest smoke test.",
+              "resources": [
+                {
+                  "label": "Pandas docs",
+                  "url": "https://pandas.pydata.org/docs/"
+                }
+              ]
+            },
+            {
+              "id": "w1-d3",
+              "kind": "practice",
+              "title": "Exploratory visuals",
+              "details": "Plot 2-3 figures with captions and insights.",
+              "resources": [
+                {
+                  "label": "Matplotlib gallery",
+                  "url": "https://matplotlib.org/stable/gallery/index.html"
+                }
+              ]
+            },
+            {
+              "id": "w1-d4",
+              "kind": "deliverable",
+              "title": "Dockerize cleaning script",
+              "details": "Write Dockerfile + document docker run instructions.",
+              "resources": []
+            },
+            {
+              "id": "w1-d5",
+              "kind": "output",
+              "title": "Publish English micro summary",
+              "details": "Pitfalls and fixes from the week.",
+              "resources": []
+            },
+            {
+              "id": "w1-weekend",
+              "kind": "project",
+              "title": "Package CLI tool usable by others",
+              "details": "Add argparse help, sample data, usage guide.",
+              "resources": []
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "theme": "Data validation & visualization",
+          "milestones": [
+            "Add automated data checks",
+            "Produce polished notebook report",
+            "Share 2nd public update"
+          ],
+          "tasks": [
+            {
+              "id": "w2-eda",
+              "kind": "project",
+              "title": "Slow-disease dataset EDA report",
+              "details": "Cleaning → Viz → English summary (Quarto/Markdown)."
+            },
+            {
+              "id": "w2-cli",
+              "kind": "project",
+              "title": "CLI validation suite",
+              "details": "Add schema checks + pytest + Docker image update."
+            },
+            {
+              "id": "w2-lifeline",
+              "kind": "habit",
+              "title": "Daily deep work block",
+              "details": "70 min focused build on project assets."
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "theme": "R tidyverse & stats",
+          "milestones": [
+            "R project skeleton",
+            "First survival analysis attempt",
+            "Weekly public note"
+          ],
+          "tasks": [
+            {
+              "id": "w3-rsetup",
+              "kind": "practice",
+              "title": "Set up R environment + renv",
+              "details": "Install tidyverse, survival, configure renv lock."
+            },
+            {
+              "id": "w3-km",
+              "kind": "project",
+              "title": "Kaplan-Meier prototype",
+              "details": "Use sample dataset to produce KM plot + interpretation."
+            },
+            {
+              "id": "w3-output",
+              "kind": "output",
+              "title": "Write combined Python/R weekly reflection",
+              "details": "Focus on cross-language lessons learned."
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "theme": "Docker mastery & dual small projects",
+          "milestones": [
+            "Two small projects online",
+            "Documented run instructions",
+            "Consistent public log"
+          ],
+          "tasks": [
+            {
+              "id": "w4-small1",
+              "kind": "project",
+              "title": "Finalize EDA report with visuals",
+              "details": "Ship polished report with charts & insights."
+            },
+            {
+              "id": "w4-small2",
+              "kind": "project",
+              "title": "Release CLI cleaning tool",
+              "details": "Usage docs, sample dataset, Docker image, Github release draft."
+            },
+            {
+              "id": "w4-celebrate",
+              "kind": "habit",
+              "title": "Weekly review ritual",
+              "details": "30 min review metrics, plan next sprint."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "title": "Phase 2 · Week 5-8 · ML & deployment",
+      "summary": "Feature engineering, baseline models, first online service",
+      "weeks": [
+        {
+          "number": 5,
+          "theme": "Feature pipelines + metrics",
+          "milestones": [
+            "Baseline ML notebook",
+            "Evaluation report",
+            "Micro blog"
+          ],
+          "tasks": [
+            {
+              "id": "w5-feature",
+              "kind": "project",
+              "title": "Feature engineering sprint",
+              "details": "Transform slow disease dataset, track data leakage checks."
+            },
+            {
+              "id": "w5-metrics",
+              "kind": "practice",
+              "title": "Model evaluation dashboard",
+              "details": "Confusion matrix, AUC/PR, fairness notes."
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "theme": "API skeleton",
+          "milestones": [
+            "FastAPI service",
+            "Docker Compose",
+            "CI pipeline"
+          ],
+          "tasks": [
+            {
+              "id": "w6-api",
+              "kind": "project",
+              "title": "FastAPI predict endpoint",
+              "details": "Health + predict routes, load model.pkl, tests."
+            },
+            {
+              "id": "w6-ci",
+              "kind": "practice",
+              "title": "CI pipeline setup",
+              "details": "Lint/test/build + push image via GitHub Actions."
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "theme": "VPS deployment",
+          "milestones": [
+            "Nginx reverse proxy",
+            "HTTPS",
+            "Monitoring"
+          ],
+          "tasks": [
+            {
+              "id": "w7-vps",
+              "kind": "project",
+              "title": "Deploy baseline service",
+              "details": "Nginx + systemd + journald instructions + screenshot."
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "theme": "Ship middle project A",
+          "milestones": [
+            "Complete risk scoring service",
+            "Document results",
+            "Publish long-form article"
+          ],
+          "tasks": [
+            {
+              "id": "w8-polish",
+              "kind": "project",
+              "title": "Polish slow disease scoring service",
+              "details": "Finalize README, add latency metrics, record demo video."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "title": "Phase 3 · Week 9-12 · TCGA reproducible research",
+      "summary": "R survival workflows, automation, reproducibility",
+      "weeks": [
+        {
+          "number": 9,
+          "theme": "Data ingest automation",
+          "milestones": [
+            "TCGA download scripts",
+            "renv lock",
+            "targets pipeline"
+          ],
+          "tasks": [
+            {
+              "id": "w9-ingest",
+              "kind": "project",
+              "title": "Automate TCGA data ingest",
+              "details": "Download, preprocess, log provenance."
+            }
+          ]
+        },
+        {
+          "number": 10,
+          "theme": "Survival modeling",
+          "milestones": [
+            "Cox baseline",
+            "Assumption checks",
+            "Visualization"
+          ],
+          "tasks": [
+            {
+              "id": "w10-cox",
+              "kind": "project",
+              "title": "Build Cox/LASSO survival models",
+              "details": "KM curves, forest plot, hazard ratios table."
+            }
+          ]
+        },
+        {
+          "number": 11,
+          "theme": "Reporting",
+          "milestones": [
+            "Quarto report",
+            "Results replication",
+            "Peer feedback"
+          ],
+          "tasks": [
+            {
+              "id": "w11-report",
+              "kind": "output",
+              "title": "Write methods + results report",
+              "details": "4-6 plots, 2-3 tables, limitations section."
+            }
+          ]
+        },
+        {
+          "number": 12,
+          "theme": "Pipeline hardening",
+          "milestones": [
+            "Full rerun success",
+            "Session info",
+            "README polish"
+          ],
+          "tasks": [
+            {
+              "id": "w12-hardening",
+              "kind": "project",
+              "title": "Harden reproducible pipeline",
+              "details": "Targets automation, environment capture, release tag."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "title": "Phase 4 · Week 13-16 · Clinical data service demo",
+      "summary": "Monitoring, privacy, end-to-end productization",
+      "weeks": [
+        {
+          "number": 13,
+          "theme": "Monitoring & drift",
+          "milestones": [
+            "Drift checks",
+            "Logging",
+            "Dashboard"
+          ],
+          "tasks": [
+            {
+              "id": "w13-monitor",
+              "kind": "project",
+              "title": "Implement monitoring hooks",
+              "details": "Statistical thresholds, logging, alert plan."
+            }
+          ]
+        },
+        {
+          "number": 14,
+          "theme": "Privacy & security",
+          "milestones": [
+            "Data minimization",
+            "Secrets management",
+            "Access controls"
+          ],
+          "tasks": [
+            {
+              "id": "w14-privacy",
+              "kind": "practice",
+              "title": "Design privacy playbook",
+              "details": "Document fields, masking, consent notes."
+            }
+          ]
+        },
+        {
+          "number": 15,
+          "theme": "Demo polish",
+          "milestones": [
+            "Frontend visualization",
+            "Compose stack",
+            "User guide"
+          ],
+          "tasks": [
+            {
+              "id": "w15-demo",
+              "kind": "project",
+              "title": "Polish clinical data service demo",
+              "details": "Compose stack, sample data generator, swagger polish."
+            }
+          ]
+        },
+        {
+          "number": 16,
+          "theme": "Launch + portfolio",
+          "milestones": [
+            "Public demo",
+            "Portfolio page",
+            "Final retrospective"
+          ],
+          "tasks": [
+            {
+              "id": "w16-launch",
+              "kind": "output",
+              "title": "Launch & portfolio shipping",
+              "details": "Publish demo, capture screenshots, final write-up."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "daily_ritual": {
+    "deep_work_minutes": 70,
+    "artifact_minutes": 20,
+    "micro_post_minutes": 20,
+    "review_minutes": 10,
+    "habits": [
+      "Start with yesterday's commit review",
+      "Focus block with timer",
+      "Capture learnings in English",
+      "Record blockers for weekly retro"
+    ]
+  },
+  "streak_rules": {
+    "daily_checkpoint": [
+      "Logged deep work block",
+      "Created visible artifact",
+      "Published micro output"
+    ],
+    "weekly_success": [
+      ">=5 commits",
+      ">=1 runnable asset",
+      ">=1 public update",
+      ">=1 feedback request"
+    ]
+  }
+}

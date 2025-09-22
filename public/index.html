@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skill Sprint Coach</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-container">
+      <header class="app-header">
+        <div>
+          <h1>Skill Sprint Coach</h1>
+          <p class="tagline">用 16 周路线把临床数据科学计划落地。</p>
+        </div>
+        <div class="start-date-control">
+          <label for="start-date">路线起始日</label>
+          <input type="date" id="start-date" />
+          <button id="save-start">保存</button>
+        </div>
+      </header>
+
+      <section class="status-grid">
+        <article class="status-card">
+          <h2>今日专注</h2>
+          <div id="today-summary" class="today-summary"></div>
+        </article>
+        <article class="status-card">
+          <h2>总体进度</h2>
+          <div id="overall-progress" class="overall-progress"></div>
+        </article>
+        <article class="status-card">
+          <h2>激励提醒</h2>
+          <div id="nudges" class="nudges"></div>
+        </article>
+      </section>
+
+      <div id="status-banner" class="status-banner" aria-live="polite"></div>
+
+      <section class="ritual-section">
+        <div class="section-header">
+          <h2>每日仪式 Daily Ritual</h2>
+          <button id="reset-ritual">重置今日</button>
+        </div>
+        <ul id="ritual-list" class="ritual-list"></ul>
+        <div class="ritual-metrics" id="ritual-metrics"></div>
+      </section>
+
+      <section class="week-section">
+        <div class="section-header">
+          <h2>本周冲刺 Weekly Sprint</h2>
+          <div>
+            <span id="phase-label" class="badge"></span>
+            <span id="week-label" class="badge"></span>
+          </div>
+        </div>
+        <p id="week-theme" class="section-description"></p>
+        <h3>关键里程碑</h3>
+        <ul id="milestone-list" class="milestone-list"></ul>
+
+        <h3>任务清单</h3>
+        <div id="task-list" class="task-list"></div>
+      </section>
+
+      <section class="log-section">
+        <div class="section-header">
+          <h2>学习日志 Log</h2>
+          <button id="export-log">导出 JSON</button>
+        </div>
+        <button id="log-template" class="ghost">填充日志模板</button>
+        <textarea id="log-input" placeholder="记录今天的坑点、亮点、下一步……"></textarea>
+        <button id="save-log">保存日志</button>
+        <div id="saved-log" class="saved-log"></div>
+      </section>
+
+      <section class="backlog-section">
+        <div class="section-header">
+          <h2>阶段总览 Backlog</h2>
+          <button id="toggle-backlog">展开</button>
+        </div>
+        <div id="backlog" class="backlog hidden"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

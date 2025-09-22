@@ -1,0 +1,12 @@
+{
+  "startDate": "2025-09-23",
+  "progress": {
+    "w1-d1": "done"
+  },
+  "ritual": {
+    "2025-09-22": {
+      "review": true
+    }
+  },
+  "logs": {}
+}
