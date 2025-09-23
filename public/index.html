@@ -35,6 +35,38 @@
         </article>
       </section>
 
+      <section class="insights-section">
+        <div class="section-header">
+          <h2>进度洞察 Insight Hub</h2>
+          <button id="refresh-insights" class="ghost">刷新数据</button>
+        </div>
+        <div class="insights-grid">
+          <article class="insight-card">
+            <h3>完成概览</h3>
+            <p id="insight-summary" class="insight-metric"></p>
+            <div id="insight-weekly" class="insight-weekly"></div>
+          </article>
+          <article class="insight-card chart-card">
+            <div class="chart-header">
+              <h3>累计完成趋势</h3>
+              <small id="insight-progress-range"></small>
+            </div>
+            <canvas id="progress-chart" width="360" height="160"></canvas>
+          </article>
+          <article class="insight-card chart-card">
+            <div class="chart-header">
+              <h3>每日仪式完成度</h3>
+              <small>最近 30 天</small>
+            </div>
+            <canvas id="ritual-chart" width="360" height="160"></canvas>
+          </article>
+          <article class="insight-card">
+            <h3>连续记录</h3>
+            <div id="insight-streaks" class="insight-streaks"></div>
+          </article>
+        </div>
+      </section>
+
       <div id="status-banner" class="status-banner" aria-live="polite"></div>
 
       <section class="ritual-section">
@@ -71,6 +103,18 @@
         <textarea id="log-input" placeholder="记录今天的坑点、亮点、下一步……"></textarea>
         <button id="save-log">保存日志</button>
         <div id="saved-log" class="saved-log"></div>
+      </section>
+
+      <section class="portfolio-section">
+        <div class="section-header">
+          <h2>作品集同步 Portfolio</h2>
+          <div class="portfolio-controls">
+            <input type="text" id="portfolio-username" placeholder="GitHub 用户名" />
+            <button id="sync-portfolio">同步</button>
+          </div>
+        </div>
+        <p id="portfolio-meta" class="section-description"></p>
+        <div id="portfolio-grid" class="portfolio-grid"></div>
       </section>
 
       <section class="backlog-section">

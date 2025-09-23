@@ -1,14 +1,42 @@
+const PERSIST_KEYS = {
+  backlog: "skill-sprint/backlogExpanded"
+};
+
 const state = {
   data: null,
   startDate: null,
   progress: {},
+  progressHistory: [],
   ritual: {},
-  logs: {}
+  logs: {},
+  portfolio: {
+    username: "",
+    lastSync: null,
+    items: [],
+    summary: { totalItems: 0, totalStars: 0, topLanguages: [] }
+  },
+  insights: null
 };
 
 let statusTimer = null;
+const ui = {
+  backlogExpanded: false
+};
+
+initializeUiState();
 
 document.addEventListener("DOMContentLoaded", bootstrap);
+
+function initializeUiState() {
+  try {
+    const storedBacklog = localStorage.getItem(PERSIST_KEYS.backlog);
+    if (storedBacklog != null) {
+      ui.backlogExpanded = storedBacklog === "true";
+    }
+  } catch (error) {
+    console.warn("ui state init fallback", error);
+  }
+}
 
 async function bootstrap() {
   setStatus("正在加载路线…", "info");
@@ -30,6 +58,8 @@ async function bootstrap() {
       throw new Error("无法加载学习进度");
     }
 
+    await Promise.all([refreshInsights(), refreshPortfolio()]);
+
     initControls();
     render();
     setStatus("准备就绪，开始冲刺吧！", "success", 1500);
@@ -42,8 +72,14 @@ async function bootstrap() {
 function assignState(payload = {}) {
   state.startDate = payload.startDate || null;
   state.progress = payload.progress || {};
+  state.progressHistory = Array.isArray(payload.progressHistory)
+    ? payload.progressHistory
+    : [];
   state.ritual = payload.ritual || {};
   state.logs = payload.logs || {};
+  if (payload.portfolio) {
+    assignPortfolio(payload.portfolio);
+  }
 }
 
 function deepClone(value) {
@@ -55,7 +91,8 @@ function snapshotState() {
     startDate: state.startDate,
     progress: deepClone(state.progress) || {},
     ritual: deepClone(state.ritual) || {},
-    logs: deepClone(state.logs) || {}
+    logs: deepClone(state.logs) || {},
+    portfolio: deepClone(state.portfolio) || {}
   };
 }
 
@@ -91,7 +128,130 @@ async function persistState(partial) {
 
   const payload = await response.json();
   assignState(payload);
+  await refreshInsights();
   setStatus("保存完成 ✔️", "success", 1200);
+}
+
+async function refreshInsights(showToast = false) {
+  try {
+    const response = await fetch("/api/insights");
+    if (!response.ok) {
+      throw new Error("洞察数据获取失败");
+    }
+    const data = await response.json();
+    state.insights = data;
+
+    if (data?.portfolio) {
+      const incoming = data.portfolio;
+      state.portfolio.summary = incoming.summary || computePortfolioSummary(state.portfolio.items);
+      if (incoming.items && incoming.items.length) {
+        state.portfolio.items = incoming.items;
+      }
+      if (incoming.username) {
+        state.portfolio.username = incoming.username;
+      }
+      if (incoming.lastSync) {
+        state.portfolio.lastSync = incoming.lastSync;
+      }
+    }
+
+    if (showToast) {
+      setStatus("洞察已刷新", "success", 1200);
+    }
+  } catch (error) {
+    console.error(error);
+    if (showToast) {
+      setStatus(error.message || "洞察刷新失败", "error", 2000);
+    }
+  }
+}
+
+async function refreshPortfolio() {
+  try {
+    const response = await fetch("/api/portfolio");
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    assignPortfolio(data);
+  } catch (error) {
+    console.warn("portfolio fetch skipped", error);
+  }
+}
+
+async function syncPortfolio(username) {
+  try {
+    setStatus("正在同步作品集…", "info");
+    const response = await fetch("/api/portfolio/sync", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ provider: "github", username, limit: 12 })
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "作品集同步失败");
+    }
+
+    const payload = await response.json();
+    assignPortfolio(payload);
+    await refreshInsights();
+    renderPortfolio();
+    renderInsights();
+    setStatus("作品集已同步 ✔️", "success", 1600);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+function assignPortfolio(payload = {}) {
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  state.portfolio = {
+    username: payload.username || state.portfolio.username || "",
+    lastSync: payload.lastSync || null,
+    items,
+    summary: payload.summary || computePortfolioSummary(items)
+  };
+}
+
+function computePortfolioSummary(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { totalItems: 0, totalStars: 0, topLanguages: [] };
+  }
+
+  const totalStars = items.reduce((acc, item) => acc + (item.stars || 0), 0);
+  const languageMap = new Map();
+  items.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+    if (item.language) {
+      const key = item.language;
+      languageMap.set(key, (languageMap.get(key) || 0) + 1);
+    }
+    if (Array.isArray(item.topics)) {
+      item.topics.forEach((topic) => {
+        if (!topic) return;
+        const key = `#${topic}`;
+        languageMap.set(key, (languageMap.get(key) || 0) + 0.2);
+      });
+    }
+  });
+
+  const topLanguages = Array.from(languageMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([language, count]) => ({ language, count: Math.round(count) }));
+
+  return {
+    totalItems: items.length,
+    totalStars,
+    topLanguages
+  };
 }
 
 function handleError(error) {
@@ -130,6 +290,42 @@ function initControls() {
   const startInput = document.getElementById("start-date");
   if (state.startDate) {
     startInput.value = state.startDate;
+  }
+
+  const refreshButton = document.getElementById("refresh-insights");
+  if (refreshButton) {
+    refreshButton.addEventListener("click", async () => {
+      await refreshInsights(true);
+      renderInsights();
+    });
+  }
+
+  const usernameInput = document.getElementById("portfolio-username");
+  if (usernameInput && state.portfolio.username) {
+    usernameInput.value = state.portfolio.username;
+  }
+
+  const syncButton = document.getElementById("sync-portfolio");
+  if (syncButton) {
+    const triggerSync = async () => {
+      const value = usernameInput ? usernameInput.value.trim() : "";
+      if (!value) {
+        setStatus("请输入 GitHub 用户名", "error", 2000);
+        if (usernameInput) usernameInput.focus();
+        return;
+      }
+      await syncPortfolio(value);
+    };
+
+    syncButton.addEventListener("click", triggerSync);
+    if (usernameInput) {
+      usernameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          triggerSync();
+        }
+      });
+    }
   }
 
   document.getElementById("save-start").addEventListener("click", () => {
@@ -210,11 +406,12 @@ function initControls() {
   });
 
   document.getElementById("toggle-backlog").addEventListener("click", (event) => {
-    const el = document.getElementById("backlog");
-    const button = event.currentTarget;
-    el.classList.toggle("hidden");
-    button.textContent = el.classList.contains("hidden") ? "展开" : "收起";
+    ui.backlogExpanded = !ui.backlogExpanded;
+    persistUiState();
+    applyBacklogVisibility(event.currentTarget);
   });
+
+  applyBacklogVisibility(document.getElementById("toggle-backlog"));
 }
 
 function render() {
@@ -225,6 +422,8 @@ function render() {
   renderRitual();
   renderWeek();
   renderLog();
+  renderInsights();
+  renderPortfolio();
   renderBacklog();
 }
 
@@ -267,7 +466,19 @@ function renderToday() {
 
 function renderOverallProgress() {
   const container = document.getElementById("overall-progress");
-  const counts = computeProgressCounts();
+  if (!container) return;
+
+  let counts = computeProgressCounts();
+  if (state.insights?.summary) {
+    const summary = state.insights.summary;
+    counts = {
+      total: summary.totalTasks,
+      done: summary.done,
+      inFlight: summary.snoozed,
+      todo: summary.todo
+    };
+  }
+
   const total = counts.total || 1;
   const percent = Math.round((counts.done / total) * 100);
 
@@ -305,6 +516,16 @@ function renderNudges() {
     messages.push("太棒了，所有任务都完成！写个 retro 奖励一下自己。");
   } else if (counts.done === 0) {
     messages.push("从最小的下一步开始，完成后记得标记完成。");
+  }
+
+  const ritualStreak = state.insights?.streaks?.ritual?.current || 0;
+  if (ritualStreak >= 3) {
+    messages.push(`已连续 ${ritualStreak} 天完成每日仪式，保持势头！`);
+  }
+
+  const portfolioCount = state.portfolio.items?.length || 0;
+  if (portfolioCount > 0) {
+    messages.push(`作品集已有 ${portfolioCount} 项，如果有新成果，请记得点击同步更新。`);
   }
 
   container.innerHTML = messages
@@ -499,6 +720,161 @@ function renderLog() {
   saved.textContent = entries.join("\n\n");
 }
 
+function renderInsights() {
+  const summaryEl = document.getElementById("insight-summary");
+  const weeklyEl = document.getElementById("insight-weekly");
+  const streakEl = document.getElementById("insight-streaks");
+  const rangeEl = document.getElementById("insight-progress-range");
+  if (!summaryEl || !weeklyEl || !streakEl) return;
+
+  const insights = state.insights;
+  if (!insights) {
+    summaryEl.textContent = "暂无洞察数据，先完成一个任务或同步作品集试试。";
+    weeklyEl.innerHTML = '<p class="muted">等待更多进度记录…</p>';
+    streakEl.innerHTML = '<p class="muted">暂无连续统计</p>';
+    if (rangeEl) rangeEl.textContent = "";
+    drawLineChart("progress-chart", []);
+    drawBarChart("ritual-chart", []);
+    return;
+  }
+
+  const summary = insights.summary;
+  summaryEl.innerHTML = `
+    <strong>${summary.completionRate}%</strong> 完成率 ·
+    ${summary.done}/${summary.totalTasks} 任务已完成 ·
+    ${summary.todo} 待完成
+  `;
+
+  const weeklyCandidates = (insights.weekly || [])
+    .slice()
+    .sort((a, b) => a.percent - b.percent)
+    .slice(0, 3);
+
+  weeklyEl.innerHTML = weeklyCandidates.length
+    ? weeklyCandidates
+        .map((week) => {
+          const tag = escapeHtml(`第 ${week.week} 周`);
+          return `<span class="weekly-pill">${tag} · ${week.percent}%</span>`;
+        })
+        .join("")
+    : '<span class="weekly-pill">所有周已完成 🎉</span>';
+
+  const progressSeries = (insights.charts?.progress || []).map((item) => ({
+    label: item.date,
+    value: item.done
+  }));
+
+  drawLineChart("progress-chart", progressSeries, {
+    max: summary.totalTasks,
+    stroke: "#2563eb"
+  });
+
+  if (rangeEl) {
+    if (progressSeries.length > 1) {
+      rangeEl.textContent = `${progressSeries[0].label} ~ ${progressSeries[progressSeries.length - 1].label}`;
+    } else {
+      rangeEl.textContent = progressSeries[0]?.label || "";
+    }
+  }
+
+  const ritualSeries = (insights.charts?.ritual || []).map((item) => ({
+    label: item.date,
+    value: item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0
+  }));
+  drawBarChart("ritual-chart", ritualSeries, {
+    max: 100,
+    fill: "rgba(37, 99, 235, 0.2)",
+    stroke: "#2563eb"
+  });
+
+  const ritualStreak = insights.streaks?.ritual || { current: 0, longest: 0 };
+  const logStreak = insights.streaks?.log || { current: 0, longest: 0 };
+
+  streakEl.innerHTML = `
+    <div class="streak-card">
+      <strong>${ritualStreak.current}</strong>
+      <span>每日仪式连续天</span>
+    </div>
+    <div class="streak-card">
+      <strong>${logStreak.current}</strong>
+      <span>日志连续天</span>
+    </div>
+    <small>历史最佳：仪式 ${ritualStreak.longest} 天 · 日志 ${logStreak.longest} 天</small>
+  `;
+}
+
+function renderPortfolio() {
+  const grid = document.getElementById("portfolio-grid");
+  const meta = document.getElementById("portfolio-meta");
+  if (!grid || !meta) return;
+
+  const items = state.portfolio.items || [];
+  const summary = state.portfolio.summary || computePortfolioSummary(items);
+  const username = state.portfolio.username;
+  const lastSyncText = state.portfolio.lastSync
+    ? `上次同步：${formatRelativeDate(state.portfolio.lastSync)}`
+    : "尚未同步";
+
+  const languageHighlights = (summary.topLanguages || [])
+    .filter((entry) => entry.language && !entry.language.startsWith("#"))
+    .slice(0, 3)
+    .map((entry) => entry.language)
+    .join(" · ");
+
+  const metaPieces = [lastSyncText, `${summary.totalItems} 个仓库`, `⭐️ ${summary.totalStars}`];
+  if (languageHighlights) {
+    metaPieces.push(`主力栈：${languageHighlights}`);
+  }
+
+  meta.textContent = items.length
+    ? metaPieces.join(" ｜ ")
+    : `尚未同步 GitHub 作品集，输入用户名后点击同步。`;
+
+  if (!items.length) {
+    grid.innerHTML = '<p class="muted">同步后将自动生成作品集列表。</p>';
+    return;
+  }
+
+  grid.innerHTML = items
+    .map((item) => {
+      const title = escapeHtml(item.title || item.repo || "未命名仓库");
+      const description = escapeHtml(item.description || "暂未填写描述");
+      const url = typeof item.url === "string" && item.url.startsWith("http") ? item.url : "#";
+      const language = escapeHtml(item.language || "");
+      const updated = item.updatedAt ? formatRelativeDate(item.updatedAt) : "";
+      const topics = Array.isArray(item.topics)
+        ? item.topics
+            .slice(0, 4)
+            .map((topic) => `<span class="topic-tag">${escapeHtml(topic)}</span>`)
+            .join("")
+        : "";
+      const topicsMarkup = topics ? `<div class="topic-row">${topics}</div>` : "";
+
+      return `
+        <article class="portfolio-card">
+          <header>
+            <a href="${url}" target="_blank" rel="noopener">${title}</a>
+            <span class="stars">⭐️ ${item.stars || 0}</span>
+          </header>
+          <p>${description}</p>
+          <footer>
+            <span>${language || "多语言"}</span>
+            <span>${updated}</span>
+          </footer>
+          ${topicsMarkup}
+        </article>
+      `;
+    })
+    .join("");
+
+  if (username) {
+    const usernameInput = document.getElementById("portfolio-username");
+    if (usernameInput && !usernameInput.value) {
+      usernameInput.value = username;
+    }
+  }
+}
+
 function renderBacklog() {
   const container = document.getElementById("backlog");
   container.innerHTML = "";
@@ -538,6 +914,8 @@ function renderBacklog() {
 
     container.appendChild(phaseEl);
   });
+
+  applyBacklogVisibility(document.getElementById("toggle-backlog"));
 }
 
 function updateTaskStatus(taskId, status) {
@@ -726,4 +1104,170 @@ function defaultLogTemplate() {
     "## 下一步",
     "- "
   ].join("\n");
+}
+
+function prepareCanvas(target) {
+  const canvas = typeof target === "string" ? document.getElementById(target) : target;
+  if (!canvas) return null;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || canvas.width;
+  const height = canvas.clientHeight || canvas.height;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  return { canvas, ctx, width, height };
+}
+
+function drawLineChart(canvasId, series, options = {}) {
+  const prepared = prepareCanvas(canvasId);
+  if (!prepared) return;
+  const { ctx, width, height } = prepared;
+
+  if (!Array.isArray(series) || series.length === 0) {
+    drawEmptyChartPrepared(prepared, options.emptyMessage || "暂无数据");
+    return;
+  }
+
+  const padding = options.padding ?? 16;
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+
+  const values = series.map((point) => point.value ?? 0);
+  const maxValue = options.max ?? Math.max(...values, 1);
+  const minValue = options.min ?? Math.min(...values, 0);
+  const range = maxValue - minValue || 1;
+
+  ctx.strokeStyle = options.stroke || "#2563eb";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  series.forEach((point, index) => {
+    const ratio = series.length > 1 ? index / (series.length - 1) : 0;
+    const x = padding + ratio * innerWidth;
+    const value = (point.value ?? 0) - minValue;
+    const y = height - padding - (value / range) * innerHeight;
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.stroke();
+
+  ctx.fillStyle = options.pointColor || ctx.strokeStyle;
+  series.forEach((point, index) => {
+    const ratio = series.length > 1 ? index / (series.length - 1) : 0;
+    const x = padding + ratio * innerWidth;
+    const value = (point.value ?? 0) - minValue;
+    const y = height - padding - (value / range) * innerHeight;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawBarChart(canvasId, series, options = {}) {
+  const prepared = prepareCanvas(canvasId);
+  if (!prepared) return;
+  const { ctx, width, height } = prepared;
+
+  if (!Array.isArray(series) || series.length === 0) {
+    drawEmptyChartPrepared(prepared, options.emptyMessage || "暂无记录");
+    return;
+  }
+
+  const padding = options.padding ?? 16;
+  const gap = options.barGap ?? 6;
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+  const values = series.map((point) => point.value ?? 0);
+  const maxValue = options.max ?? Math.max(...values, 1);
+  const barWidth = Math.max(6, (innerWidth - gap * (series.length - 1)) / series.length);
+
+  ctx.fillStyle = options.fill || "rgba(37, 99, 235, 0.25)";
+  ctx.strokeStyle = options.stroke || "#2563eb";
+  ctx.lineWidth = 1;
+
+  series.forEach((point, index) => {
+    const value = Math.max(0, Math.min(maxValue, point.value ?? 0));
+    const heightRatio = value / (maxValue || 1);
+    const barHeight = innerHeight * heightRatio;
+    const x = padding + index * (barWidth + gap);
+    const y = height - padding - barHeight;
+    ctx.fillRect(x, y, barWidth, barHeight);
+    ctx.strokeRect(x, y, barWidth, barHeight);
+  });
+}
+
+function drawEmptyChartPrepared(prepared, message) {
+  if (!prepared) return;
+  const { ctx, width, height } = prepared;
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "12px 'Inter', 'Helvetica Neue', sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.fillText(message, 16, height / 2);
+}
+
+function formatRelativeDate(value) {
+  if (!value) return "";
+  const date = typeof value === "string" || typeof value === "number" ? new Date(value) : value;
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  const now = new Date();
+  const diffMs = now - date;
+  const absMs = Math.abs(diffMs);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (absMs < minute) return "刚刚";
+  if (absMs < hour) {
+    const mins = Math.round(absMs / minute);
+    return `${mins} 分钟前`;
+  }
+  if (absMs < day) {
+    const hours = Math.round(absMs / hour);
+    return `${hours} 小时前`;
+  }
+  const days = Math.round(absMs / day);
+  if (days < 30) {
+    return `${days} 天前`;
+  }
+  return formatDate(date);
+}
+
+function escapeHtml(input) {
+  if (input == null) return "";
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  };
+  return String(input).replace(/[&<>"']/g, (char) => map[char]);
+}
+
+function persistUiState() {
+  try {
+    localStorage.setItem(PERSIST_KEYS.backlog, String(ui.backlogExpanded));
+  } catch (error) {
+    console.warn("ui state persist skipped", error);
+  }
+}
+
+function applyBacklogVisibility(button) {
+  const container = document.getElementById("backlog");
+  if (!container) return;
+  container.classList.toggle("hidden", !ui.backlogExpanded);
+  if (button) {
+    button.textContent = ui.backlogExpanded ? "收起" : "展开";
+  }
 }

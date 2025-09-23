@@ -3,10 +3,163 @@
   "progress": {
     "w1-d1": "done"
   },
+  "progressHistory": [],
   "ritual": {
     "2025-09-22": {
       "review": true
-    }
+    },
+    "2025-09-23": {}
   },
-  "logs": {}
+  "logs": {},
+  "portfolio": {
+    "provider": "github",
+    "username": "zhanbingli",
+    "lastSync": "2025-09-23T02:25:11.234Z",
+    "items": [
+      {
+        "id": "1061118926",
+        "type": "repo",
+        "title": "wechat-artical",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/wechat-artical",
+        "repo": "Zhanbingli/wechat-artical",
+        "stars": 0,
+        "language": "",
+        "topics": [],
+        "updatedAt": "2025-09-23T02:13:55Z"
+      },
+      {
+        "id": "1060486022",
+        "type": "repo",
+        "title": "ebook-The-Future-of-AI",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/ebook-The-Future-of-AI",
+        "repo": "Zhanbingli/ebook-The-Future-of-AI",
+        "stars": 0,
+        "language": "",
+        "topics": [],
+        "updatedAt": "2025-09-23T01:21:38Z"
+      },
+      {
+        "id": "1061793306",
+        "type": "repo",
+        "title": "skill-learn",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/skill-learn",
+        "repo": "Zhanbingli/skill-learn",
+        "stars": 0,
+        "language": "JavaScript",
+        "topics": [],
+        "updatedAt": "2025-09-22T12:25:45Z"
+      },
+      {
+        "id": "1059829445",
+        "type": "repo",
+        "title": "medical_net",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/medical_net",
+        "repo": "Zhanbingli/medical_net",
+        "stars": 0,
+        "language": "Python",
+        "topics": [],
+        "updatedAt": "2025-09-22T11:30:56Z"
+      },
+      {
+        "id": "989963075",
+        "type": "repo",
+        "title": "zhanbing",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/zhanbing",
+        "repo": "Zhanbingli/zhanbing",
+        "stars": 0,
+        "language": "TypeScript",
+        "topics": [],
+        "updatedAt": "2025-09-22T09:06:18Z"
+      },
+      {
+        "id": "1057950345",
+        "type": "repo",
+        "title": "translate_extension",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/translate_extension",
+        "repo": "Zhanbingli/translate_extension",
+        "stars": 0,
+        "language": "JavaScript",
+        "topics": [],
+        "updatedAt": "2025-09-21T07:14:54Z"
+      },
+      {
+        "id": "1057202583",
+        "type": "repo",
+        "title": "my_ebooks_YC",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/my_ebooks_YC",
+        "repo": "Zhanbingli/my_ebooks_YC",
+        "stars": 1,
+        "language": "Python",
+        "topics": [],
+        "updatedAt": "2025-09-20T01:50:17Z"
+      },
+      {
+        "id": "992047016",
+        "type": "repo",
+        "title": "my_ebook",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/my_ebook",
+        "repo": "Zhanbingli/my_ebook",
+        "stars": 0,
+        "language": "",
+        "topics": [],
+        "updatedAt": "2025-09-18T12:29:10Z"
+      },
+      {
+        "id": "960870029",
+        "type": "repo",
+        "title": "my_usmle",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/my_usmle",
+        "repo": "Zhanbingli/my_usmle",
+        "stars": 0,
+        "language": "TypeScript",
+        "topics": [],
+        "updatedAt": "2025-09-18T11:06:03Z"
+      },
+      {
+        "id": "994782593",
+        "type": "repo",
+        "title": "health-manager",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/health-manager",
+        "repo": "Zhanbingli/health-manager",
+        "stars": 0,
+        "language": "TypeScript",
+        "topics": [],
+        "updatedAt": "2025-09-09T13:52:11Z"
+      },
+      {
+        "id": "1034409464",
+        "type": "repo",
+        "title": "r_research_bioinformation",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/r_research_bioinformation",
+        "repo": "Zhanbingli/r_research_bioinformation",
+        "stars": 0,
+        "language": "R",
+        "topics": [],
+        "updatedAt": "2025-08-13T12:46:45Z"
+      },
+      {
+        "id": "1006395653",
+        "type": "repo",
+        "title": "r",
+        "description": "",
+        "url": "https://github.com/Zhanbingli/r",
+        "repo": "Zhanbingli/r",
+        "stars": 0,
+        "language": "JavaScript",
+        "topics": [],
+        "updatedAt": "2025-08-03T07:51:52Z"
+      }
+    ]
+  }
 }
