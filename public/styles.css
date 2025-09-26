@@ -87,6 +87,255 @@ body {
   box-shadow: var(--shadow);
 }
 
+.command-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--card);
+  padding: 16px 24px;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.command-bar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.command-bar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-section {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.agent-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.1fr) minmax(280px, 1fr);
+  gap: 20px;
+}
+
+.agent-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agent-form textarea {
+  min-height: 120px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  resize: vertical;
+  font-family: inherit;
+}
+
+.agent-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.agent-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: center;
+}
+
+.agent-controls input,
+.agent-controls select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.agent-controls button {
+  justify-self: end;
+  min-width: 160px;
+}
+
+.agent-output {
+  background: rgba(37, 99, 235, 0.05);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.agent-output h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.agent-output .agent-section-title {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.agent-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #1f2937;
+  display: grid;
+  gap: 6px;
+}
+
+.agent-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  color: #1e3a8a;
+}
+
+.agent-metadata {
+  font-size: 0.8rem;
+  color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.agent-output pre {
+  font-size: 0.78rem;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  padding: 10px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.agent-step-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-step {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  display: grid;
+  gap: 8px;
+}
+
+.agent-step h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.agent-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.agent-loading span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.agent-loading span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.agent-loading span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #1e3a8a;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.muted-chip {
+  background: rgba(148, 163, 184, 0.18);
+  color: #64748b;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
+
+.icon-button .icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.icon-button.active,
+.icon-button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.icon-button.active .icon,
+.icon-button[aria-pressed="true"] .icon {
+  transform: scale(1.05);
+}
+
 button {
   cursor: pointer;
   border: none;
@@ -213,6 +462,42 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-stats {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.segmented-control button {
+  background: transparent;
+  color: #1e3a8a;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
+.segmented-control button.active {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 10px 20px -12px rgba(37, 99, 235, 0.8);
 }
 
 .insights-grid {
@@ -469,6 +754,15 @@ input:focus-visible {
   background: rgba(5, 150, 105, 0.08);
 }
 
+.task-card.snoozed {
+  border-color: rgba(217, 119, 6, 0.6);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.task-card.todo {
+  border-color: var(--border);
+}
+
 .task-card header {
   display: flex;
   justify-content: space-between;
@@ -510,6 +804,16 @@ input:focus-visible {
   margin: 0;
 }
 
+.empty-state {
+  margin: 0;
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.15);
+  color: #475569;
+  text-align: center;
+  font-weight: 500;
+}
+
 .resource-links {
   display: flex;
   flex-wrap: wrap;
@@ -548,6 +852,10 @@ textarea {
   gap: 16px;
 }
 
+.backlog.hidden {
+  display: none;
+}
+
 .backlog-phase {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -571,6 +879,25 @@ textarea {
 .backlog-week strong {
   display: flex;
   gap: 6px;
+}
+
+body.focus-mode .week-section {
+  border: 2px solid var(--accent);
+  box-shadow: 0 28px 60px -32px rgba(37, 99, 235, 0.55);
+}
+
+body.focus-mode .week-section h2 {
+  color: var(--accent);
+}
+
+body.focus-mode .status-grid,
+body.focus-mode .insights-section,
+body.focus-mode .ritual-section,
+body.focus-mode .log-section,
+body.focus-mode .portfolio-section,
+body.focus-mode .backlog-section {
+  opacity: 0.45;
+  transition: opacity 160ms ease;
 }
 
 @media (max-width: 720px) {
@@ -608,5 +935,29 @@ textarea {
 
   .insight-streaks {
     flex-direction: column;
+  }
+
+  .agent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-controls button {
+    justify-self: stretch;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
   }
 }

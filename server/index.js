@@ -90,6 +90,24 @@ app.post("/api/portfolio/sync", async (req, res) => {
   }
 });
 
+app.post("/api/agent", async (req, res) => {
+  const sanitized = sanitizeAgentPayload(req.body);
+  if (!sanitized.valid) {
+    return res.status(400).json({ message: sanitized.message });
+  }
+
+  try {
+    const [roadmap] = await Promise.all([loadRoadmap()]);
+    const state = readState();
+    const insights = generateInsights(state, roadmap);
+    const result = await generateAgentPlan(sanitized.value, { state, roadmap, insights });
+    res.json(result);
+  } catch (error) {
+    console.error("Agent plan generation failed", error);
+    res.status(502).json({ message: error.message || "AI 助手生成失败" });
+  }
+});
+
 app.use(express.static(PUBLIC_DIR, { extensions: ["html"] }));
 
 app.use((req, res) => {
@@ -863,6 +881,438 @@ async function fetchGithubPortfolio({ username, token, limit, repos }) {
       language: repo.language || "",
       topics: Array.isArray(repo.topics) ? repo.topics : []
     }));
+}
+
+function sanitizeAgentPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return { valid: false, message: "请求体需要是 JSON 对象" };
+  }
+
+  const goal = typeof payload.goal === "string" ? payload.goal.trim() : "";
+  if (!goal) {
+    return { valid: false, message: "请提供想启动的目标或项目描述" };
+  }
+
+  const rawDuration = Number.parseInt(payload.duration, 10);
+  const duration = Number.isFinite(rawDuration) ? Math.min(Math.max(rawDuration, 1), 30) : 5;
+  const allowedFocus = new Set(["clarify", "build", "launch"]);
+  const focus = typeof payload.focus === "string" && allowedFocus.has(payload.focus) ? payload.focus : "build";
+  const includeProgress = typeof payload.includeProgress === "boolean" ? payload.includeProgress : true;
+  const includeBacklog = typeof payload.includeBacklog === "boolean" ? payload.includeBacklog : true;
+  const includeLogs = typeof payload.includeLogs === "boolean" ? payload.includeLogs : false;
+
+  return {
+    valid: true,
+    value: {
+      goal,
+      duration,
+      focus,
+      includeProgress,
+      includeBacklog,
+      includeLogs
+    }
+  };
+}
+
+async function generateAgentPlan(options, context) {
+  const planContext = buildAgentPromptContext(options, context);
+  const tags = planContext.tags;
+
+  if (!process.env.OPENAI_API_KEY) {
+    const fallbackPlan = buildFallbackAgentPlan(options, planContext);
+    return {
+      plan: fallbackPlan.plan,
+      raw: fallbackPlan.raw,
+      provider: "fallback",
+      model: "offline-template",
+      generatedAt: new Date().toISOString(),
+      usedFallback: true,
+      context: { tags }
+    };
+  }
+
+  try {
+    const aiResult = await requestAgentFromLLM(options, planContext);
+    aiResult.context = { tags };
+    return aiResult;
+  } catch (error) {
+    console.warn("LLM 调用失败，使用离线模板", error);
+    const fallbackPlan = buildFallbackAgentPlan(options, planContext);
+    return {
+      plan: fallbackPlan.plan,
+      raw: fallbackPlan.raw,
+      provider: "fallback",
+      model: "offline-template",
+      generatedAt: new Date().toISOString(),
+      usedFallback: true,
+      context: { tags },
+      message: error.message
+    };
+  }
+}
+
+function buildAgentPromptContext(options, { state, roadmap, insights }) {
+  const lines = [];
+  const tags = [options.focus];
+  const focusLabel = agentFocusLabel(options.focus);
+  const progressSummary = insights?.summary || { totalTasks: 0, done: 0, snoozed: 0 };
+
+  lines.push(`目标: ${options.goal}`);
+  lines.push(`冲刺时长: ${options.duration} 天`);
+  lines.push(`主要侧重点: ${focusLabel}`);
+
+  let currentWeekInfo = null;
+  if (options.includeBacklog) {
+    currentWeekInfo = locateCurrentWeekSlot(state.startDate, roadmap, new Date());
+  }
+
+  if (options.includeProgress && progressSummary.totalTasks > 0) {
+    tags.push("progress");
+    lines.push(
+      `当前完成 ${progressSummary.done}/${progressSummary.totalTasks} 个任务（延后 ${progressSummary.snoozed} 个）`
+    );
+  }
+
+  const streaks = insights?.streaks || {};
+  if (options.includeProgress && (streaks.ritual?.current || streaks.log?.current)) {
+    const ritual = streaks.ritual?.current || 0;
+    const log = streaks.log?.current || 0;
+    lines.push(`当前 streak：每日仪式 ${ritual} 天，日志 ${log} 天`);
+  }
+
+  let backlogHighlights = [];
+  if (options.includeBacklog) {
+    tags.push("backlog");
+    backlogHighlights = collectBacklogHighlights(roadmap, state.progress || {}, currentWeekInfo);
+    if (backlogHighlights.length) {
+      const rendered = backlogHighlights
+        .slice(0, 5)
+        .map((item) => `- ${item.phase} · Week ${item.week}: ${item.title} (${item.status})`)
+        .join("\n");
+      lines.push("重点待办：\n" + rendered);
+    }
+  }
+
+  let recentLogs = [];
+  if (options.includeLogs) {
+    tags.push("logs");
+    recentLogs = collectRecentLogs(state.logs || {});
+    if (recentLogs.length) {
+      const renderedLogs = recentLogs.map((entry) => `- ${entry.date}: ${entry.summary}`).join("\n");
+      lines.push("最近日志：\n" + renderedLogs);
+    }
+  }
+
+  const customGoals = Array.isArray(state.customGoals) ? state.customGoals.slice(0, 5) : [];
+  if (customGoals.length) {
+    const renderedGoals = customGoals
+      .map((goal) => `- ${goal.title || "未命名"} (${goal.status || "todo"})`)
+      .join("\n");
+    lines.push("自定义目标：\n" + renderedGoals);
+  }
+
+  const promptText = lines.join("\n\n");
+
+  return {
+    lines,
+    tags,
+    progressSummary,
+    currentWeekInfo,
+    backlogHighlights,
+    recentLogs,
+    focusLabel,
+    roadmap,
+    state,
+    insights,
+    promptText
+  };
+}
+
+async function requestAgentFromLLM(options, planContext) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+  const systemPrompt = [
+    "You are Skill Sprint Launch Agent, a product-minded AI coach helping indie learners start projects with very low friction.",
+    "Respond in Simplified Chinese.",
+    "Return JSON with keys: summary (string), quickWins (string[]), steps (array of {title, tasks, outcome, focus, duration}), resources (string[]), reminders (string[]).",
+    "Prefer concise sentences and actionable verbs."
+  ].join(" ");
+
+  const userPrompt = [
+    planContext.promptText,
+    "输出时请结合以上上下文，帮助我在限定时间内完成一个可展示的最小可交付成果。"
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const bodyWithSchema = {
+    model,
+    temperature: 0.4,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    response_format: { type: "json_object" }
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`
+  };
+
+  const url = `${baseUrl}/chat/completions`;
+
+  let response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(bodyWithSchema)
+  });
+
+  if (!response.ok && response.status === 400) {
+    const fallbackBody = {
+      ...bodyWithSchema
+    };
+    delete fallbackBody.response_format;
+    response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(fallbackBody)
+    });
+  }
+
+  if (!response.ok) {
+    const message = await readResponseBody(response);
+    const error = new Error(message || `OpenAI 返回状态 ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const data = await response.json();
+  const message = data?.choices?.[0]?.message?.content;
+  if (!message) {
+    throw new Error("AI 响应为空");
+  }
+
+  let plan;
+  try {
+    plan = JSON.parse(message);
+  } catch (error) {
+    plan = { summary: message };
+  }
+
+  return {
+    plan,
+    raw: message,
+    provider: "openai",
+    model,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function buildFallbackAgentPlan(options, context) {
+  const progress = context.progressSummary || { done: 0, totalTasks: 0 };
+  const goalSnippet = options.goal.length > 80 ? `${options.goal.slice(0, 77)}…` : options.goal;
+  const quickWins = [
+    `写下“完成 ${goalSnippet}”的验收条件，并与路线任务对照，时间限制 20 分钟`,
+    "生成一个 30 分钟可以完成的微任务，并立即安排到日历",
+    "打开现有仓库/文档，创建今日的 commit stub（README 或 TODO）"
+  ];
+
+  const duration = options.duration;
+  const midRange = Math.max(duration - 2, 1);
+  const steps = [
+    {
+      title: "Day 1 · 对齐目标与资源",
+      tasks: [
+        "复述成功定义与交付标准，确认不可妥协项",
+        "列出必需数据/素材清单并确定来源",
+        "把冲刺分成每天可交付的最小动作"
+      ],
+      outcome: "拥有一个 3～5 项的执行清单，并完成环境/数据准备",
+      focus: context.focusLabel,
+      duration: "~2 小时"
+    },
+    {
+      title: `Day 2-${midRange} · 构建核心可见产出`,
+      tasks: [
+        "优先实现“用户能看到/体验”的主流程",
+        "每完成一个节点即提交 commit，并简单记录阻碍",
+        "若遇阻塞 >30 分钟，记录问题并换下一个子任务"
+      ],
+      outcome: "形成可以演示的主路径，哪怕是草稿版本",
+      focus: "构建",
+      duration: `${Math.max(duration - 2, 1)} 天`
+    },
+    {
+      title: "最后一天 · 打磨与反馈",
+      tasks: [
+        "整理 README 或一页简介，写明目的、做法、下一步",
+        "录制 1 分钟演示或准备线下演示脚本",
+        "把成果同步给 1 位伙伴或导师，邀请反馈"
+      ],
+      outcome: "交付可复现、可点评的成果，并明确下一个迭代方向",
+      focus: "发布",
+      duration: "~1 天"
+    }
+  ];
+
+  if (duration <= 2) {
+    steps[1] = {
+      title: "Day 2 · 构建并交付",
+      tasks: [
+        "集中 90 分钟完成核心功能或分析",
+        "撰写结论与图表/截图，整理输出物",
+        "向目标用户或伙伴进行快速分享"
+      ],
+      outcome: "完成一个能真实演示的最小版本，并获得一次反馈",
+      focus: "发布",
+      duration: "1 天"
+    };
+    steps.length = 2;
+  }
+
+  const resources = [
+    "Quick README 模板（目标/步骤/结果/下一步）",
+    "10-3-1 时间块：10 分钟计划、3 个 25 分钟深工、1 次复盘",
+    "Micro log 模板：Pitfall / Decision / Next"
+  ];
+
+  const reminders = [
+    "每天至少一次可见产出（commit、截图或文字结论）",
+    "记录阻碍并设置次日的解法假设",
+    "保持 micro log，方便 AI 或伙伴继续协助"
+  ];
+
+  if (context.currentWeekInfo?.week?.theme) {
+    resources.unshift(`周主题：${context.currentWeekInfo.week.theme}`);
+  }
+
+  const header = [`当前完成率：${progress.done}/${progress.totalTasks || "?"}`, context.promptText].filter(Boolean).join("\n");
+  const raw = [header, "---", "Quick Wins:", ...quickWins].join("\n");
+
+  return {
+    plan: {
+      summary: `我们将在 ${options.duration} 天内完成「${goalSnippet}」的最小可交付成果。优先保障可见产出，其次才是完美度。`,
+      quickWins,
+      steps,
+      resources,
+      reminders,
+      contextTags: context.tags
+    },
+    raw
+  };
+}
+
+function collectBacklogHighlights(roadmap, progress, currentWeekInfo) {
+  const highlights = [];
+  if (currentWeekInfo?.week) {
+    currentWeekInfo.week.tasks.forEach((task) => {
+      const status = progress[task.id] || "todo";
+      if (status !== "done") {
+        highlights.push({
+          phase: currentWeekInfo.phase.title,
+          week: currentWeekInfo.week.number,
+          title: task.title,
+          status
+        });
+      }
+    });
+  }
+
+  if (highlights.length >= 4) {
+    return highlights.slice(0, 6);
+  }
+
+  roadmap.phases.forEach((phase) => {
+    phase.weeks.forEach((week) => {
+      week.tasks.forEach((task) => {
+        if (highlights.length >= 6) return;
+        const status = progress[task.id] || "todo";
+        if (status !== "done") {
+          highlights.push({ phase: phase.title, week: week.number, title: task.title, status });
+        }
+      });
+    });
+  });
+
+  return highlights.slice(0, 6);
+}
+
+function collectRecentLogs(logs) {
+  return Object.entries(logs)
+    .sort(([a], [b]) => (a < b ? 1 : -1))
+    .slice(0, 3)
+    .map(([date, text]) => ({
+      date,
+      summary: String(text).split(/\n|。/)[0].trim().slice(0, 160)
+    }));
+}
+
+function locateCurrentWeekSlot(startDate, roadmap, today) {
+  if (!startDate) return null;
+  const start = new Date(startDate);
+  if (Number.isNaN(start.getTime())) {
+    return null;
+  }
+
+  const now = today instanceof Date ? today : new Date();
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor((toMidnight(now) - toMidnight(start)) / msPerDay);
+  if (diffDays < 0) {
+    const firstPhase = roadmap.phases[0];
+    return {
+      phase: firstPhase,
+      week: firstPhase.weeks[0],
+      index: 0
+    };
+  }
+
+  const targetIndex = Math.floor(diffDays / 7);
+  let cursor = 0;
+  for (const phase of roadmap.phases) {
+    for (const week of phase.weeks) {
+      if (cursor === targetIndex) {
+        return { phase, week, index: cursor };
+      }
+      cursor += 1;
+    }
+  }
+  return null;
+}
+
+function toMidnight(date) {
+  const cloned = new Date(date);
+  cloned.setHours(0, 0, 0, 0);
+  return cloned.getTime();
+}
+
+function agentFocusLabel(focus) {
+  switch (focus) {
+    case "clarify":
+      return "澄清方向 / 定义需求";
+    case "launch":
+      return "上线 / 收集反馈";
+    default:
+      return "制作可见产出";
+  }
+}
+
+async function readResponseBody(response) {
+  try {
+    const data = await response.json();
+    if (data && typeof data === "object") {
+      return data.error?.message || data.message || JSON.stringify(data);
+    }
+  } catch (error) {
+    // ignore
+  }
+  try {
+    return await response.text();
+  } catch (error) {
+    return "";
+  }
 }
 
 module.exports = app;

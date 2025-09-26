@@ -1,6 +1,10 @@
 const PERSIST_KEYS = {
-  backlog: "skill-sprint/backlogExpanded"
+  backlog: "skill-sprint/backlogExpanded",
+  focusMode: "skill-sprint/focusMode",
+  taskFilter: "skill-sprint/taskFilter"
 };
+
+const TASK_FILTERS = new Set(["all", "todo", "done", "snoozed"]);
 
 const state = {
   data: null,
@@ -15,12 +19,17 @@ const state = {
     items: [],
     summary: { totalItems: 0, totalStars: 0, topLanguages: [] }
   },
-  insights: null
+  insights: null,
+  agentPlan: null,
+  currentWeek: null
 };
 
 let statusTimer = null;
 const ui = {
-  backlogExpanded: false
+  backlogExpanded: false,
+  focusMode: false,
+  taskFilter: "all",
+  agentBusy: false
 };
 
 initializeUiState();
@@ -33,6 +42,14 @@ function initializeUiState() {
     if (storedBacklog != null) {
       ui.backlogExpanded = storedBacklog === "true";
     }
+    const storedFocus = localStorage.getItem(PERSIST_KEYS.focusMode);
+    if (storedFocus != null) {
+      ui.focusMode = storedFocus === "true";
+    }
+    const storedFilter = localStorage.getItem(PERSIST_KEYS.taskFilter);
+    if (storedFilter && TASK_FILTERS.has(storedFilter)) {
+      ui.taskFilter = storedFilter;
+    }
   } catch (error) {
     console.warn("ui state init fallback", error);
   }
@@ -40,6 +57,7 @@ function initializeUiState() {
 
 async function bootstrap() {
   setStatus("正在加载路线…", "info");
+  applyFocusMode();
   try {
     const [roadmapRes, stateRes] = await Promise.all([
       fetch("/api/roadmap"),
@@ -154,6 +172,8 @@ async function refreshInsights(showToast = false) {
         state.portfolio.lastSync = incoming.lastSync;
       }
     }
+
+    renderWeek();
 
     if (showToast) {
       setStatus("洞察已刷新", "success", 1200);
@@ -292,6 +312,25 @@ function initControls() {
     startInput.value = state.startDate;
   }
 
+  const focusToggle = document.getElementById("toggle-focus-mode");
+  if (focusToggle) {
+    focusToggle.addEventListener("click", () => {
+      ui.focusMode = !ui.focusMode;
+      persistUiState();
+      applyFocusMode();
+    });
+  }
+
+  const jumpToLogButton = document.getElementById("jump-to-log");
+  if (jumpToLogButton) {
+    jumpToLogButton.addEventListener("click", () => {
+      const logSection = document.getElementById("log-section");
+      if (logSection) {
+        logSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
   const refreshButton = document.getElementById("refresh-insights");
   if (refreshButton) {
     refreshButton.addEventListener("click", async () => {
@@ -412,6 +451,79 @@ function initControls() {
   });
 
   applyBacklogVisibility(document.getElementById("toggle-backlog"));
+
+  const filterContainer = document.getElementById("task-filter");
+  if (filterContainer) {
+    filterContainer.querySelectorAll("button[data-filter]").forEach((button) => {
+      const { filter } = button.dataset;
+      button.addEventListener("click", () => {
+        if (!filter || !TASK_FILTERS.has(filter) || filter === ui.taskFilter) return;
+        ui.taskFilter = filter;
+        persistUiState();
+        updateTaskFilterButtons();
+        renderWeek();
+      });
+    });
+  }
+
+  applyFocusMode();
+  updateTaskFilterButtons();
+
+  const agentGoalInput = document.getElementById("agent-goal");
+  const agentRunButton = document.getElementById("agent-run");
+  const agentDurationInput = document.getElementById("agent-duration");
+  const agentFocusSelect = document.getElementById("agent-focus");
+  const includeProgressInput = document.getElementById("agent-include-progress");
+  const includeBacklogInput = document.getElementById("agent-include-backlog");
+  const includeLogsInput = document.getElementById("agent-include-logs");
+
+  const handleAgentTrigger = async () => {
+    if (ui.agentBusy) return;
+    const goal = agentGoalInput ? agentGoalInput.value.trim() : "";
+    if (!goal) {
+      setStatus("请先描述想启动的项目或问题", "error", 2200);
+      if (agentGoalInput) {
+        agentGoalInput.focus();
+      }
+      return;
+    }
+    const duration = agentDurationInput ? Number.parseInt(agentDurationInput.value, 10) : 5;
+    const payload = {
+      goal,
+      duration: Number.isFinite(duration) ? Math.min(Math.max(duration, 1), 30) : 5,
+      focus: agentFocusSelect ? agentFocusSelect.value : "build",
+      includeProgress: includeProgressInput ? includeProgressInput.checked : true,
+      includeBacklog: includeBacklogInput ? includeBacklogInput.checked : true,
+      includeLogs: includeLogsInput ? includeLogsInput.checked : false
+    };
+    await runAgentPlan(payload);
+  };
+
+  if (agentRunButton) {
+    agentRunButton.addEventListener("click", handleAgentTrigger);
+  }
+
+  if (agentGoalInput) {
+    agentGoalInput.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        handleAgentTrigger();
+      }
+    });
+  }
+
+  const agentFillWeekButton = document.getElementById("agent-fill-week");
+  if (agentFillWeekButton && agentGoalInput) {
+    agentFillWeekButton.addEventListener("click", () => {
+      const template = buildAgentWeekTemplate();
+      if (!template) {
+        setStatus("请先设置起始日，或等待路线加载完成", "error", 2200);
+        return;
+      }
+      agentGoalInput.value = template;
+      agentGoalInput.focus();
+    });
+  }
 }
 
 function render() {
@@ -425,6 +537,7 @@ function render() {
   renderInsights();
   renderPortfolio();
   renderBacklog();
+  renderAgentOutput();
 }
 
 function renderToday() {
@@ -615,6 +728,11 @@ function renderWeek() {
   const theme = document.getElementById("week-theme");
   const milestoneList = document.getElementById("milestone-list");
   const taskList = document.getElementById("task-list");
+  state.currentWeek = null;
+  const info = start ? locateWeek(start, new Date()) : null;
+
+  renderCommandBar(info);
+  updateTaskFilterButtons();
 
   if (!start) {
     phaseLabel.textContent = "";
@@ -622,19 +740,21 @@ function renderWeek() {
     theme.textContent = "";
     milestoneList.innerHTML = "";
     taskList.innerHTML = "";
+    updateTaskStats({ total: 0, done: 0, snoozed: 0, todo: 0 });
     return;
   }
 
-  const info = locateWeek(start, new Date());
   if (!info) {
     phaseLabel.textContent = "路线完成";
     weekLabel.textContent = "🎉";
     theme.textContent = "恭喜完成所有阶段，准备写总结吧。";
     milestoneList.innerHTML = "";
-    taskList.innerHTML = "";
+    taskList.innerHTML = '<p class="empty-state">可以回顾 backlog 或沉淀复盘心得。</p>';
+    updateTaskStats({ total: 0, done: 0, snoozed: 0, todo: 0 });
     return;
   }
 
+  state.currentWeek = info;
   phaseLabel.textContent = info.phase.title;
   weekLabel.textContent = `第 ${info.week.number} 周`;
   theme.textContent = info.week.theme;
@@ -643,14 +763,30 @@ function renderWeek() {
     .map((item) => `<li>${item}</li>`)
     .join("");
 
+  const counts = computeWeekTaskCounts(info.week);
+  updateTaskStats(counts);
+
+  const filter = ui.taskFilter;
+  const filteredTasks = info.week.tasks.filter((task) => matchesTaskFilter(state.progress[task.id], filter));
+
+  if (!filteredTasks.length) {
+    taskList.innerHTML = '<p class="empty-state">当前筛选暂无任务，切换到“全部”查看完整清单。</p>';
+    return;
+  }
+
   taskList.innerHTML = "";
-  info.week.tasks.forEach((task) => {
+  filteredTasks.forEach((task) => {
     const card = document.createElement("article");
     card.className = "task-card";
     const status = state.progress[task.id];
     if (status === "done") {
       card.classList.add("done");
+    } else if (status === "snoozed") {
+      card.classList.add("snoozed");
+    } else {
+      card.classList.add("todo");
     }
+    card.dataset.status = status || "todo";
 
     const header = document.createElement("header");
     const title = document.createElement("h4");
@@ -1258,9 +1394,381 @@ function escapeHtml(input) {
 function persistUiState() {
   try {
     localStorage.setItem(PERSIST_KEYS.backlog, String(ui.backlogExpanded));
+    localStorage.setItem(PERSIST_KEYS.focusMode, String(ui.focusMode));
+    localStorage.setItem(PERSIST_KEYS.taskFilter, ui.taskFilter);
   } catch (error) {
     console.warn("ui state persist skipped", error);
   }
+}
+
+function applyFocusMode() {
+  const focusClass = "focus-mode";
+  if (document.body) {
+    document.body.classList.toggle(focusClass, ui.focusMode);
+  }
+  const toggle = document.getElementById("toggle-focus-mode");
+  if (toggle) {
+    toggle.setAttribute("aria-pressed", String(ui.focusMode));
+    toggle.classList.toggle("active", ui.focusMode);
+    const label = toggle.querySelector(".label");
+    if (label) {
+      label.textContent = ui.focusMode ? "关闭专注模式" : "开启专注模式";
+    }
+  }
+}
+
+function updateTaskFilterButtons() {
+  const container = document.getElementById("task-filter");
+  if (!container) return;
+  container.querySelectorAll("button[data-filter]").forEach((button) => {
+    const value = button.dataset.filter;
+    const isActive = value === ui.taskFilter;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+}
+
+function updateTaskStats(counts = {}) {
+  const statsEl = document.getElementById("task-stats");
+  if (!statsEl) return;
+  const total = counts.total ?? 0;
+  const done = counts.done ?? 0;
+  const snoozed = counts.snoozed ?? 0;
+  const todo = counts.todo ?? Math.max(total - done - snoozed, 0);
+  const segments = [
+    `本周任务 ${total}`,
+    `✔️ 已完成 ${done}`,
+    `⚪ 待完成 ${todo}`
+  ];
+  if (snoozed > 0) {
+    segments.push(`⏭ 延后 ${snoozed}`);
+  }
+  statsEl.textContent = segments.join(" · ");
+  statsEl.classList.toggle("muted", total === 0);
+}
+
+function renderCommandBar(info) {
+  const phaseChip = document.getElementById("current-phase-chip");
+  const streakChip = document.getElementById("streak-chip");
+
+  if (phaseChip) {
+    if (!state.startDate) {
+      phaseChip.textContent = "等待设置起点";
+      phaseChip.classList.add("muted-chip");
+    } else if (!info) {
+      phaseChip.textContent = "路线完成 · 进入复盘";
+      phaseChip.classList.remove("muted-chip");
+    } else {
+      const weekCounts = computeWeekTaskCounts(info.week);
+      const percent = weekCounts.total > 0 ? Math.round((weekCounts.done / weekCounts.total) * 100) : 0;
+      phaseChip.textContent = `${info.phase.title} · 第 ${info.week.number} 周 · ${percent}%`;
+      phaseChip.classList.remove("muted-chip");
+    }
+  }
+
+  if (streakChip) {
+    const ritualStreak = state.insights?.streaks?.ritual || { current: 0, longest: 0 };
+    const logStreak = state.insights?.streaks?.log || { current: 0, longest: 0 };
+    const formatStreak = (streak) => {
+      const current = streak.current || 0;
+      const longest = streak.longest || 0;
+      if (!longest || longest === current) {
+        return `${current} 天`;
+      }
+      return `${current}/${longest} 天`;
+    };
+    streakChip.textContent = `仪式 ${formatStreak(ritualStreak)} · 日志 ${formatStreak(logStreak)}`;
+    const hasProgress = (ritualStreak.current || 0) > 0 || (logStreak.current || 0) > 0;
+    streakChip.classList.toggle("muted-chip", !hasProgress);
+  }
+}
+
+function computeWeekTaskCounts(week) {
+  if (!week || !Array.isArray(week.tasks)) {
+    return { total: 0, done: 0, snoozed: 0, todo: 0 };
+  }
+  return week.tasks.reduce(
+    (acc, task) => {
+      acc.total += 1;
+      const status = state.progress[task.id];
+      if (status === "done") {
+        acc.done += 1;
+      } else if (status === "snoozed") {
+        acc.snoozed += 1;
+      } else {
+        acc.todo += 1;
+      }
+      return acc;
+    },
+    { total: 0, done: 0, snoozed: 0, todo: 0 }
+  );
+}
+
+function matchesTaskFilter(status, filter) {
+  switch (filter) {
+    case "done":
+      return status === "done";
+    case "snoozed":
+      return status === "snoozed";
+    case "todo":
+      return status !== "done" && status !== "snoozed";
+    default:
+      return true;
+  }
+}
+
+async function runAgentPlan(options) {
+  const container = document.getElementById("agent-output");
+  if (!container) return;
+  ui.agentBusy = true;
+  container.innerHTML = agentLoadingMarkup("AI 正在生成启动计划…");
+  try {
+    const response = await fetch("/api/agent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(options)
+    });
+
+    if (!response.ok) {
+      const message = await readResponseMessage(response);
+      throw new Error(message || `AI 服务返回状态 ${response.status}`);
+    }
+
+    const payload = await response.json();
+    state.agentPlan = normalizeAgentPlanResponse(payload, options);
+    renderAgentOutput();
+    setStatus("AI 启动方案已准备好", "success", 1800);
+  } catch (error) {
+    console.error(error);
+    state.agentPlan = null;
+    container.innerHTML = `<p class="muted">AI 助手暂时不可用：${escapeHtml(error.message || "未知错误")}</p>`;
+    setStatus(error.message || "AI 助手调用失败", "error", 2400);
+  } finally {
+    ui.agentBusy = false;
+  }
+}
+
+function renderAgentOutput() {
+  const container = document.getElementById("agent-output");
+  if (!container) return;
+  if (ui.agentBusy) {
+    container.innerHTML = agentLoadingMarkup("AI 正在生成启动计划…");
+    return;
+  }
+
+  const plan = state.agentPlan;
+  if (!plan) {
+    container.innerHTML = '<p class="muted">描述想要启动的项目，AI 会结合路线进度给出低摩擦行动方案。</p>';
+    return;
+  }
+
+  container.innerHTML = renderAgentPlanMarkup(plan);
+}
+
+function renderAgentPlanMarkup(plan) {
+  const blocks = [];
+  if (plan.summary) {
+    blocks.push(`<p>${escapeHtml(plan.summary)}</p>`);
+  }
+
+  if (plan.quickWins && plan.quickWins.length) {
+    const items = plan.quickWins.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    blocks.push(`
+      <div>
+        <h3 class="agent-section-title">低摩擦起步</h3>
+        <ul class="agent-list">${items}</ul>
+      </div>
+    `);
+  }
+
+  if (plan.steps && plan.steps.length) {
+    const stepsMarkup = plan.steps
+      .map((step, index) => {
+        const title = step.title ? escapeHtml(step.title) : `阶段 ${index + 1}`;
+        const detail = step.outcome ? `<p class="muted">${escapeHtml(step.outcome)}</p>` : "";
+        const focus = step.focus ? `<span class="agent-pill">${escapeHtml(step.focus)}</span>` : "";
+        const duration = step.duration ? `<span class="agent-pill">${escapeHtml(step.duration)}</span>` : "";
+        const pills = [focus, duration].filter(Boolean).join("");
+        const pillRow = pills ? `<div class="agent-pill-row">${pills}</div>` : "";
+        const tasks = step.tasks && step.tasks.length
+          ? `<ul class="agent-list">${step.tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("")}</ul>`
+          : "";
+        return `
+          <article class="agent-step">
+            <h3>${index + 1}. ${title}</h3>
+            ${pillRow}
+            ${tasks}
+            ${detail}
+          </article>
+        `;
+      })
+      .join("");
+
+    blocks.push(`
+      <div>
+        <h3 class="agent-section-title">冲刺拆解</h3>
+        <div class="agent-step-grid">${stepsMarkup}</div>
+      </div>
+    `);
+  }
+
+  if (plan.resources && plan.resources.length) {
+    const pills = plan.resources
+      .map((item) => `<span class="agent-pill">${escapeHtml(item)}</span>`)
+      .join("");
+    blocks.push(`
+      <div>
+        <h3 class="agent-section-title">可用资源</h3>
+        <div class="agent-pill-row">${pills}</div>
+      </div>
+    `);
+  }
+
+  if (plan.reminders && plan.reminders.length) {
+    const list = plan.reminders.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    blocks.push(`
+      <div>
+        <h3 class="agent-section-title">保持节奏</h3>
+        <ul class="agent-list">${list}</ul>
+      </div>
+    `);
+  }
+
+  if (plan.usedFallback && plan.raw) {
+    blocks.push(`
+      <details>
+        <summary>查看离线建议原文</summary>
+        <pre>${escapeHtml(plan.raw)}</pre>
+      </details>
+    `);
+  } else if (plan.raw && plan.raw !== plan.summary) {
+    blocks.push(`
+      <details>
+        <summary>查看完整回答</summary>
+        <pre>${escapeHtml(plan.raw)}</pre>
+      </details>
+    `);
+  }
+
+  const metadataPieces = [];
+  if (plan.provider) {
+    metadataPieces.push(`引擎：${plan.provider}${plan.model ? ` · ${plan.model}` : ""}`);
+  }
+  if (plan.generatedAt) {
+    metadataPieces.push(`生成于 ${formatRelativeDate(plan.generatedAt) || plan.generatedAt}`);
+  }
+  if (plan.contextTags && plan.contextTags.length) {
+    metadataPieces.push(...plan.contextTags.map((tag) => `#${tag}`));
+  }
+
+  const metadata = metadataPieces.length
+    ? `<div class="agent-metadata">${metadataPieces.map((item) => escapeHtml(item)).join(" · ")}</div>`
+    : "";
+
+  return `${blocks.join("")}${metadata}`;
+}
+
+function agentLoadingMarkup(message) {
+  return `
+    <div class="agent-loading">
+      <span></span><span></span><span></span>
+      <span>${escapeHtml(message || "AI 正在生成计划…")}</span>
+    </div>
+  `;
+}
+
+function normalizeAgentPlanResponse(payload, requestOptions = {}) {
+  const plan = payload && typeof payload === "object" && typeof payload.plan === "object" ? payload.plan : {};
+  const ensureArray = (value) => (Array.isArray(value) ? value : []);
+  const cleanList = (list, limit = 8) =>
+    ensureArray(list)
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean)
+      .slice(0, limit);
+
+  const steps = ensureArray(plan.steps)
+    .map((step) => {
+      if (!step || typeof step !== "object") return null;
+      const title = typeof step.title === "string" ? step.title.trim() : "";
+      const outcome = typeof step.outcome === "string" ? step.outcome.trim() : "";
+      const focus = typeof step.focus === "string" ? step.focus.trim() : "";
+      const duration = typeof step.duration === "string" ? step.duration.trim() : typeof step.duration === "number" ? `${step.duration} 天` : "";
+      const tasks = cleanList(step.tasks, 6);
+      if (!title && !tasks.length && !outcome) return null;
+      return {
+        title,
+        tasks,
+        outcome,
+        focus,
+        duration
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const summary = typeof plan.summary === "string" ? plan.summary.trim() : "";
+  const quickWins = cleanList(plan.quickWins, 6);
+  const resources = cleanList(plan.resources, 8);
+  const reminders = cleanList(plan.reminders, 6);
+  const contextTags = cleanList((payload?.context && payload.context.tags) || plan.contextTags || [], 6);
+  const raw = typeof payload?.raw === "string" ? payload.raw : typeof plan.raw === "string" ? plan.raw : summary;
+
+  const model = typeof payload?.model === "string" ? payload.model : typeof payload?.engineModel === "string" ? payload.engineModel : "";
+  const provider = typeof payload?.provider === "string" ? payload.provider : "LLM";
+  const generatedAt = payload?.generatedAt || new Date().toISOString();
+  const usedFallback = Boolean(payload?.usedFallback);
+
+  return {
+    summary,
+    quickWins,
+    steps,
+    resources,
+    reminders,
+    contextTags,
+    raw,
+    model,
+    provider,
+    generatedAt,
+    usedFallback,
+    request: requestOptions
+  };
+}
+
+async function readResponseMessage(response) {
+  try {
+    const data = await response.json();
+    if (data && typeof data === "object") {
+      return data.message || data.error || data.detail || "";
+    }
+  } catch (error) {
+    // ignore json parse errors
+  }
+  try {
+    const text = await response.text();
+    return text.slice(0, 400);
+  } catch (error) {
+    return "";
+  }
+}
+
+function buildAgentWeekTemplate() {
+  const info = state.currentWeek;
+  if (!info || !info.week) return "";
+  const tasks = Array.isArray(info.week.tasks)
+    ? info.week.tasks
+        .slice(0, 3)
+        .map((task) => `- ${task.title}`)
+        .join("\n")
+    : "";
+
+  const summary = [`围绕 ${info.phase.title} · 第 ${info.week.number} 周：${info.week.theme}`];
+  if (tasks) {
+    summary.push(`聚焦任务：\n${tasks}`);
+  }
+  summary.push("需要一个 3~5 天即可上线的最小 Demo，可被导师或伙伴复现和点评。");
+  return summary.join("\n\n");
 }
 
 function applyBacklogVisibility(button) {

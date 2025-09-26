@@ -20,6 +20,72 @@
         </div>
       </header>
 
+      <section class="command-bar">
+        <div class="command-bar-meta">
+          <span id="current-phase-chip" class="chip muted-chip">等待设置起点</span>
+          <span id="streak-chip" class="chip muted-chip">仪式 0 天 · 日志 0 天</span>
+        </div>
+        <div class="command-bar-actions">
+          <button id="toggle-focus-mode" class="ghost icon-button" aria-pressed="false">
+            <span class="icon" aria-hidden="true">🎯</span>
+            <span class="label">开启专注模式</span>
+          </button>
+          <button id="jump-to-log" class="ghost icon-button">
+            <span class="icon" aria-hidden="true">✍️</span>
+            <span class="label">快速记录</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="agent-section">
+        <div class="section-header">
+          <h2>AI 启动助手 Launch Agent</h2>
+          <div class="agent-shortcuts">
+            <button id="agent-fill-week" class="ghost icon-button" type="button">
+              <span class="icon" aria-hidden="true">⚡️</span>
+              <span class="label">引用本周冲刺</span>
+            </button>
+          </div>
+        </div>
+        <div class="agent-grid">
+          <div class="agent-form" role="form" aria-labelledby="agent-goal-label">
+            <label id="agent-goal-label" for="agent-goal">你想启动的项目/问题</label>
+            <textarea
+              id="agent-goal"
+              placeholder="例：在 5 天内做出一个可交付的血糖数据分析 Demo，支持医生快速筛查异常"
+            ></textarea>
+            <div class="agent-options">
+              <label>
+                <input type="checkbox" id="agent-include-progress" checked />
+                引入当前进度与 streak
+              </label>
+              <label>
+                <input type="checkbox" id="agent-include-backlog" checked />
+                结合路线 backlog 与本周任务
+              </label>
+              <label>
+                <input type="checkbox" id="agent-include-logs" />
+                参考最近的学习日志
+              </label>
+            </div>
+            <div class="agent-controls">
+              <label for="agent-duration">冲刺时长（天）</label>
+              <input type="number" id="agent-duration" min="1" max="21" value="5" />
+              <label for="agent-focus">主要目标</label>
+              <select id="agent-focus">
+                <option value="clarify">澄清方向 / 定义需求</option>
+                <option value="build" selected>制作可见产出</option>
+                <option value="launch">验证/交付给用户</option>
+              </select>
+              <button id="agent-run" type="button">生成启动计划</button>
+            </div>
+          </div>
+          <aside class="agent-output" id="agent-output" aria-live="polite">
+            <p class="muted">描述想解决的问题，AI 会结合你的路线进度给出低摩擦启动方案。</p>
+          </aside>
+        </div>
+      </section>
+
       <section class="status-grid">
         <article class="status-card">
           <h2>今日专注</h2>
@@ -87,6 +153,15 @@
           </div>
         </div>
         <p id="week-theme" class="section-description"></p>
+        <div class="task-toolbar">
+          <div id="task-stats" class="task-stats muted">本周任务 0 个</div>
+          <div id="task-filter" class="segmented-control" role="tablist" aria-label="任务筛选">
+            <button type="button" data-filter="all" class="active" role="tab" aria-selected="true">全部</button>
+            <button type="button" data-filter="todo" role="tab" aria-selected="false">待完成</button>
+            <button type="button" data-filter="done" role="tab" aria-selected="false">已完成</button>
+            <button type="button" data-filter="snoozed" role="tab" aria-selected="false">延后</button>
+          </div>
+        </div>
         <h3>关键里程碑</h3>
         <ul id="milestone-list" class="milestone-list"></ul>
 
@@ -94,7 +169,7 @@
         <div id="task-list" class="task-list"></div>
       </section>
 
-      <section class="log-section">
+      <section class="log-section" id="log-section">
         <div class="section-header">
           <h2>学习日志 Log</h2>
           <button id="export-log">导出 JSON</button>

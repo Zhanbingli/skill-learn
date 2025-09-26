@@ -1,50 +1,53 @@
 # Skill Sprint Coach
 
-一个围绕 16 周临床数据科学路线打造的学习督促平台。前端提供每日/每周驾驶舱，后端以 Node.js + JSON 持久化存储学习进度与日志，既能快速本地运行，又方便后续扩展为多端项目。
+A learning coaching platform built around a 16-week clinical data science roadmap. The frontend provides daily/weekly dashboards, while the backend uses Node.js + JSON to persist learning progress and logs, enabling quick local execution and paving the way for multi-platform expansion.
 
-## 功能亮点
+## Key Features
 
-- **路线自动匹配**：设定起始日后自动定位当前阶段、周次与主题。
-- **每日仪式面板**：70′ 深工、20′ 可见产出、20′ 英文 micro post、10′ 复盘，勾选即保存。
-- **任务看板**：展示周里程碑与任务，支持完成/延后，实时计算进度条与提醒。
-- **学习日志**：记录每日亮点，后端持久化，随时导出 JSON 备份。
-- **全局状态栏**：保存、报错、加载状态即时反馈。
-- **Backlog 透视**：完整 4 阶段概览，随时核查剩余任务。
-- **进度洞察仪表盘**：累计完成折线、仪式完成度条形图、日志/仪式连续天数一目了然。
-- **作品集同步**：连接 GitHub，自动拉取最新仓库与技术栈摘要，随时补充个人作品集。
+- **Automatic Roadmap Matching**: Automatically determines the current phase, week, and theme once the start date is set.
+- **Daily Ritual Panel**: 70 minutes of deep work, 20 minutes of visible output, 20 minutes for an English micro post, and 10 minutes for reflection; simply check off to save progress.
+- **Task Board**: Displays weekly milestones and tasks, supports marking tasks as complete or postponed, and dynamically calculates progress bars and reminders.
+- **Focus Mode & Task Filtering**: Activate focus mode with one click from the top command bar to display only the current week's sprint view; a new task filter quickly concentrates on pending tasks by status.
+- **AI Kickstart Assistant**: Leverages an LLM Agent to generate a low-friction kickstart plan in a single sentence; falls back to an offline template if the API key is not configured.
+- **Learning Log**: Records daily highlights, with backend persistence and the ability to export JSON backups at any time.
+- **Global Status Bar**: Provides instant feedback on save, error, and loading states.
+- **Backlog Overview**: Offers a complete four-phase overview, enabling you to inspect remaining tasks at any time.
+- **Progress Insights Dashboard**: Features a cumulative progress line chart, a ritual completion bar chart, and clear display of streaks for logs and rituals.
+- **Portfolio Sync**: Connects to GitHub to automatically fetch the latest repositories and technology stack summaries, keeping your personal portfolio updated.
 
-## 快速启动
+## Quick Start
 
-1. 安装依赖（需要 Node.js ≥ 18）：
+1. Install dependencies (requires Node.js ≥ 18):
    ```bash
    npm install
    ```
-2. 启动开发服务：
+2. Start the development server:
    ```bash
-   # 热重载（需全局 or 本地 nodemon）
+   # With hot-reloading (requires nodemon installed globally or locally)
    npm run dev
 
-   # 或直接启动
+   # Or start directly
    npm start
    ```
-3. 打开浏览器访问 `http://localhost:3000`，设置路线起始日即可开始使用。
+3. Open your browser and navigate to `http://localhost:3000`, then set the start date to begin using the platform.
 
-> 所有进度、日志会被保存到 `server/state.json`；删除该文件即可重置数据。
+> All progress and logs are saved in `server/state.json`; delete this file to reset the data.
 
-## API 速览
+## API Overview
 
-- `GET /api/roadmap`：返回 16 周路线配置。
-- `GET /api/state`：读取当前 startDate、progress、ritual、logs。
-- `POST /api/state`：提交部分更新，后端会合并并返回最新状态。
-- `GET /api/insights`：结合路线与本地存档生成完成率、趋势、连续天数等统计。
-- `GET /api/portfolio`：读取最近一次作品集同步结果。
-- `POST /api/portfolio/sync`：触发作品集同步，默认支持 GitHub。
+- `GET /api/roadmap`: Returns the 16-week roadmap configuration.
+- `GET /api/state`: Reads the current start date, progress, rituals, and logs.
+- `POST /api/state`: Submits partial updates; the backend merges and returns the latest state.
+- `GET /api/insights`: Generates statistics such as completion rate, trends, and streaks by combining the roadmap and local data.
+- `GET /api/portfolio`: Retrieves the latest portfolio sync result.
+- `POST /api/portfolio/sync`: Triggers portfolio synchronization, with GitHub support by default.
+- `POST /api/agent`: Requests a kickstart plan from the LLM (or uses built-in offline templates).
 
-请求体验证字段格式，防止非法状态写入。可据此对接其他前端（CLI、小程序、Telegram Bot 等）。
+Payload validation ensures proper format and prevents illegal state writes. This API can be integrated with other frontends (CLI, mini-programs, Telegram Bots, etc.).
 
-### 作品集同步（GitHub）
+### Portfolio Sync (GitHub)
 
-前端页面右下角新增 **Portfolio** 面板，输入 GitHub 用户名即可一键同步，展示仓库卡片、语言占比与星数统计。后台同样暴露 JSON API：
+A new **Portfolio** panel has been added to the bottom right of the frontend. Simply enter your GitHub username to sync with one click, displaying repository cards, language distribution, and star counts. The backend also exposes a JSON API:
 
 ```json
 POST /api/portfolio/sync
@@ -56,39 +59,52 @@ POST /api/portfolio/sync
 }
 ```
 
-> `token` 字段为可选，用于突破匿名速率或访问私有仓库。同步接口依赖 Node.js 18+ 自带的 `fetch`，无需额外安装依赖。若所在环境无法访问 GitHub，可自行注入 mock 数据后调用 `POST /api/state` 写入 `portfolio` 字段。
+> The `token` field is optional and is used to bypass anonymous rate limits or access private repositories. The sync API relies on Node.js 18+'s native `fetch`, so no additional dependencies are needed. If your environment cannot access GitHub, you can inject mock data and then call `POST /api/state` to update the `portfolio` field.
 
-## 项目结构
+### AI Kickstart Assistant (LLM Agent)
+
+1. Configure your OpenAI-compatible API key in your server or local shell:
+   ```bash
+   export OPENAI_API_KEY="sk-..."
+   export OPENAI_MODEL="gpt-4o-mini"        # Optional, defaults to gpt-4o-mini
+   export OPENAI_BASE_URL="https://api.openai.com/v1"  # Optional, supports compatible platforms
+   ```
+2. Click the "Generate Kickstart Plan" button on the frontend; the assistant will combine the current roadmap progress, backlog, and logs to create a low-friction action plan.
+
+> If `OPENAI_API_KEY` is not configured, the backend will automatically switch to an offline template, assembling a 3-5 day sprint plan based on the current week and progress. This ensures that suggestions are provided even in an offline environment.
+
+## Project Structure
 
 ```
 .
 |-- README.md
 |-- package.json
-|-- skill-root.md        # 原始路线需求
-|-- public               # 前端页面
+|-- skill-root.md        # Original roadmap requirements
+|-- public               # Frontend pages
 |   |-- index.html
 |   |-- styles.css
 |   |-- app.js
 |   `-- data
-|       `-- roadmap.json # 16 周路线数据
+|       `-- roadmap.json # 16-week roadmap data
 `-- server
-    |-- index.js         # Express 服务 + API
-    |-- store.js         # JSON 状态存储封装
-    `-- state.json       # 运行时生成的用户数据（首次启动会自动创建）
+    |-- index.js         # Express server + API
+    |-- store.js         # JSON state storage wrapper
+    `-- state.json       # User data generated at runtime (automatically created on first launch)
 ```
 
-## 可拓展方向
+## Expansion Directions
 
-- **多用户 / 鉴权**：引入 SQLite/PostgreSQL + JWT，让不同账号维护独立进度。
-- **提醒系统**：结合 cron/Celery 或外部服务触发邮件、Telegram、短信 nudges。
-- **作品集同步**：调用 GitHub/GitLab API 自动读取 commit、PR、Issues，生成周报。
-- **PWA / 桌面端**：加 Service Worker、IndexedDB 缓存，实现离线使用与桌面通知。
-- **数据可视化**：依据 `server/state.json` 的历史记录绘制 streak、完成率、投入时间。
+- **Multi-user / Authentication**: Integrate SQLite/PostgreSQL + JWT so different accounts can maintain independent progress.
+- **Reminder System**: Combine with cron/Celery or external services to trigger nudges via email, Telegram, or SMS.
+- **Portfolio Sync**: Use GitHub/GitLab APIs to automatically fetch commits, PRs, and issues to generate weekly reports.
+- **PWA / Desktop**: Add Service Worker and IndexedDB caching to enable offline usage and desktop notifications.
+- **Data Visualization**: Visualize streaks, completion rates, and time invested based on the historical data from `server/state.json`.
 
-欢迎继续把它产品化，例如迁移到 VPS、加上 FastAPI/GraphQL、或接入真实临床数据项目的任务模板。
+Feel free to further productize it, for example, by migrating to a VPS, adding FastAPI/GraphQL, or integrating task templates from real clinical data projects.
+
 ------
 
-**我打算认真学习一下数据科学技能。所以新建了一个项目，用于记录和督促我进步。**
+**I plan to seriously learn data science skills. I started this project to track and coach my progress.**
 
-1、这是开始，感谢codex和ChatGPT帮助我制定计划和指导我开始。
-2、随着做事和研究的深入，越发觉得能降低个人的启动摩擦成本这件事太重要了，所以便有了这个项目，希望我后续可以不那么懒，让这个项目继续优化下去。
+1. This is just the beginning. Thanks to Codex and ChatGPT for helping me create my plan and guide my start.
+2. As I work and research further, I realize how important it is to reduce personal startup friction. That's why I created this project, hoping that I won't be so lazy and will continue to improve it over time.
