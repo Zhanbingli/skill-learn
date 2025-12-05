@@ -2,12 +2,15 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs/promises");
 
-const { readState, updateState, mutateGoals } = require("./store");
+const { readState, updateState, mutateGoals, normalizePortfolio } = require("./store");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 const ROADMAP_PATH = path.resolve(PUBLIC_DIR, "data", "roadmap.json");
+const DEFAULT_PORTFOLIO_PROVIDER = "github";
+const SUPPORTED_PORTFOLIO_PROVIDERS = new Set([DEFAULT_PORTFOLIO_PROVIDER]);
+let roadmapCache = { mtimeMs: 0, data: null };
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
@@ -224,38 +227,23 @@ function sanitizePortfolio(payload) {
     return { valid: false, message: "portfolio 需要对象" };
   }
 
-  const provider = payload.provider === "github" ? "github" : "github";
-  const username = typeof payload.username === "string" ? payload.username.trim() : "";
-  const lastSync = typeof payload.lastSync === "string" ? payload.lastSync : null;
-  const items = Array.isArray(payload.items)
-    ? payload.items
-        .filter((item) => item && typeof item === "object")
-        .map((item) => ({
-          id: String(item.id || item.url || item.title || Date.now()),
-          type: item.type || "repo",
-          title: item.title || "",
-          description: item.description || "",
-          url: item.url || "",
-          repo: item.repo || "",
-          stars: typeof item.stars === "number" ? item.stars : 0,
-          language: typeof item.language === "string" ? item.language : "",
-          topics: Array.isArray(item.topics)
-            ? item.topics.filter((topic) => typeof topic === "string")
-            : [],
-          updatedAt: item.updatedAt || null
-        }))
-        .slice(0, 50)
-    : [];
+  const provider = normalizeProvider(payload.provider || DEFAULT_PORTFOLIO_PROVIDER);
+  if (!provider.valid) {
+    return provider;
+  }
 
   return {
     valid: true,
-    value: {
-      provider,
-      username,
-      lastSync,
-      items
-    }
+    value: normalizePortfolio({ ...payload, provider: provider.value })
   };
+}
+
+function normalizeProvider(input) {
+  const provider = (typeof input === "string" ? input.toLowerCase() : DEFAULT_PORTFOLIO_PROVIDER) || DEFAULT_PORTFOLIO_PROVIDER;
+  if (!SUPPORTED_PORTFOLIO_PROVIDERS.has(provider)) {
+    return { valid: false, message: "暂不支持该作品集来源" };
+  }
+  return { valid: true, value: provider };
 }
 
 function sanitizePortfolioSyncPayload(payload) {
@@ -263,7 +251,10 @@ function sanitizePortfolioSyncPayload(payload) {
     return { valid: false, message: "请求体需要是 JSON 对象" };
   }
 
-  const provider = payload.provider === "github" ? "github" : "github";
+  const provider = normalizeProvider(payload.provider || DEFAULT_PORTFOLIO_PROVIDER);
+  if (!provider.valid) {
+    return provider;
+  }
   const username = typeof payload.username === "string" ? payload.username.trim() : "";
   if (!username) {
     return { valid: false, message: "username 必填" };
@@ -278,7 +269,7 @@ function sanitizePortfolioSyncPayload(payload) {
   return {
     valid: true,
     value: {
-      provider,
+      provider: provider.value,
       username,
       token,
       limit,
@@ -433,8 +424,14 @@ function isPlainObject(value) {
 }
 
 async function loadRoadmap() {
+  const stats = await fs.stat(ROADMAP_PATH);
+  if (roadmapCache.data && roadmapCache.mtimeMs === stats.mtimeMs) {
+    return roadmapCache.data;
+  }
   const raw = await fs.readFile(ROADMAP_PATH, "utf8");
-  return JSON.parse(raw);
+  const parsed = JSON.parse(raw);
+  roadmapCache = { mtimeMs: stats.mtimeMs, data: parsed };
+  return parsed;
 }
 
 function generateInsights(state, roadmap) {
@@ -829,7 +826,7 @@ function clamp(value, min, max) {
 }
 
 async function fetchPortfolioItems(options) {
-  if (options.provider !== "github") {
+  if (!SUPPORTED_PORTFOLIO_PROVIDERS.has(options.provider)) {
     throw new Error("暂不支持该作品集来源");
   }
   return fetchGithubPortfolio(options);

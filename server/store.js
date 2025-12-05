@@ -299,5 +299,6 @@ module.exports = {
   writeState,
   updateState,
   mutateGoals,
+  normalizePortfolio,
   DEFAULT_STATE
 };
